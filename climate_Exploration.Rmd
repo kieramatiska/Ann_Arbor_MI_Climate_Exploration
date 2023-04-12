@@ -1,0 +1,22 @@
+---
+title: "Climate Exploration - Ann Arbor, MI"
+author: "Kiera Matiska"
+date: "2023-04-12"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(tidyverse)
+library(here)
+library(lubridate)
+library(janitor)
+```
+
+## Read in Data
+
+```{r}
+climate <- read_csv(here("data", "A2_climate_data.csv"))
+```
+
