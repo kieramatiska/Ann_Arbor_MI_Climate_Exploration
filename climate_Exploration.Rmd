@@ -12,11 +12,29 @@ library(tidyverse)
 library(here)
 library(lubridate)
 library(janitor)
+library(Kendall)
 ```
 
 ## Read in Data
 
 ```{r}
-climate <- read_csv(here("data", "A2_climate_data.csv"))
+climate_clean <- read_csv(here("data", "A2_climate_data.csv")) %>% 
+  clean_names()
+
+climate <- climate_clean %>% 
+  mutate(date = ymd(date)) %>% 
+  mutate(year = substr(date, 1, 4))
+```
+
+
+
+## Exploration Plots
+
+### Precipitation
+
+```{r}
+ggplot(climate, 
+       aes(x = date, y = prcp)) +
+  geom_line()
 ```
 
