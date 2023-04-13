@@ -13,6 +13,8 @@ library(here)
 library(lubridate)
 library(janitor)
 library(Kendall)
+library(zoo)
+library(kableExtra)
 ```
 
 ## Read in Data
@@ -23,18 +25,165 @@ climate_clean <- read_csv(here("data", "A2_climate_data.csv")) %>%
 
 climate <- climate_clean %>% 
   mutate(date = ymd(date)) %>% 
-  mutate(year = substr(date, 1, 4))
+  mutate(year = substr(date, 1, 4)) %>% 
+  mutate(month = substr(date, 6, 7)) %>% 
+  mutate(day = substr(date, 9, 10)) %>% 
+  mutate(season = case_when(
+    month == "01" ~ "winter",
+    month == "02" ~ "winter",
+    month == "03" ~ "winter",
+    month == "04" ~ "spring",
+    month == "05" ~ "spring",
+    month == "06" ~ "spring",
+    month == "07" ~ "summer",
+    month == "08" ~ "summer",
+    month == "09" ~ "summer",
+    month == "10" ~ "fall",
+    month == "11" ~ "fall",
+    month == "12" ~ "fall"
+  ))
 ```
 
+# Exploration Plots {.tabset}
 
-
-## Exploration Plots
-
-### Precipitation
+## Precipitation
 
 ```{r}
 ggplot(climate, 
        aes(x = date, y = prcp)) +
   geom_line()
 ```
+
+## Snow
+
+```{r}
+ggplot(climate,
+       aes(x = date, y = snow)) +
+  geom_line()
+```
+
+## Maximum Temperature
+
+```{r}
+ggplot(climate, 
+       aes(x = date, y = tmax)) +
+  geom_line()
+```
+
+## Minimum Temperature
+
+```{r}
+ggplot(climate, 
+       aes(x = date, y = tmin)) +
+  geom_line()
+```
+
+# Fill in Missing Data
+
+```{r}
+# precipitation and snow
+climate$prcp[is.na(climate$prcp)] <- 0
+
+climate$snow[is.na(climate$snow)] <- 0
+
+# Maximum and Minimum Temperature
+climate$tmax <- na.locf(na.locf(climate$tmax), fromLast = TRUE)
+
+climate$tmin <- na.locf(na.locf(climate$tmin), fromLast = TRUE)
+
+# Add precipitation and snow together for all precipitation
+climate <- climate %>% 
+  mutate(all_prcp = prcp + snow)
+```
+
+# Yearly Trends {.tabset}
+
+## Precipitation (Snow and Rain)
+
+```{r}
+climate_prcp_year_sum <- climate %>% 
+  group_by(year) %>% 
+  summarize(most_prcp = max(prcp),
+            least_prcp = min(prcp),
+            prcp_mean = mean(prcp),
+            most_snow = max(snow),
+            least_snow = min(snow),
+            snow_mean = mean(snow),
+            most_all_prcp = max(all_prcp),
+            least_all_prcp = min(all_prcp),
+            all_prcp_mean = mean(all_prcp))
+
+climate_prcp_year_sum %>% 
+  kable(col.names = c("Year",
+                      "Largest Rain Event",
+                      "Smallest Rain Event",
+                      "Average Rainfall",
+                      "Largest Snow Event",
+                      "Smallest Snow Event",
+                      "Average Snowfall",
+                      "Largest Precipitation Event",
+                      "Smallest Precipitation Event",
+                      "Average Precipitation")) %>% 
+  kable_styling(position = "center", bootstrap_options = "striped")
+
+precip_graph_df <- climate_prcp_year_sum %>% 
+  select(year, all_prcp_mean)
+
+ggplot(precip_graph_df, 
+       aes(x = year, y = all_prcp_mean)) +
+  geom_line()
+```
+
+## Temperature
+
+```{r}
+climate_temp_year_sum <- climate %>% 
+  group_by(year) %>% 
+  summarize(max_high_temp = max(tmax),
+            min_high_temp = min(tmax),
+            mean_high_temp = mean(tmax),
+            max_low_temp = max(tmin),
+            min_low_temp = min(tmin),
+            mean_low_temp = mean(tmin))
+
+climate_temp_year_sum %>% 
+  kable(col.names = c("Year",
+                      "Largest High Temperature",
+                      "Smallest High Temperature",
+                      "Mean High Temperature",
+                      "Largest Low Temperature",
+                      "Smallest Low Temperature",
+                      "Mean Low Temperature")) %>% 
+  kable_styling(position = "center", bootstrap_options = "striped")
+```
+
+# Seasonal Trends {.tabset}
+
+## Precipitation (Rain and Snow)
+
+```{r}
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
