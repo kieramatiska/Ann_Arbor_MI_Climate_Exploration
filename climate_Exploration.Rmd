@@ -2,11 +2,13 @@
 title: "Climate Exploration - Ann Arbor, MI"
 author: "Kiera Matiska"
 date: "2023-04-12"
-output: html_document
+output: 
+  html_document:
+    code_folding: hide
 ---
 
-```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+```{r setup, include=FALSE, message=FALSE, warning=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
 
 library(tidyverse)
 library(here)
@@ -15,6 +17,8 @@ library(janitor)
 library(Kendall)
 library(zoo)
 library(kableExtra)
+library(scales)
+library(dplyr)
 ```
 
 ## Read in Data
@@ -98,45 +102,106 @@ climate <- climate %>%
 
 # Yearly Trends {.tabset}
 
-## Precipitation (Snow and Rain)
+## Precipitation (Snow and Rain) {.tabset}
 
-```{r}
+```{r, include=FALSE}
 climate_prcp_year_sum <- climate %>% 
   group_by(year) %>% 
-  summarize(most_prcp = max(prcp),
-            least_prcp = min(prcp),
-            prcp_mean = mean(prcp),
+  summarize(most_rain = max(prcp),
+            least_rain = min(prcp),
+            total_rain = sum(prcp),
             most_snow = max(snow),
             least_snow = min(snow),
-            snow_mean = mean(snow),
+            total_snow = sum(snow),
             most_all_prcp = max(all_prcp),
             least_all_prcp = min(all_prcp),
-            all_prcp_mean = mean(all_prcp))
+            total_all_prcp = total_snow + total_rain)
+
+climate_prcp_year_sum <- climate_prcp_year_sum %>% 
+  mutate(year = as.numeric(year))
 
 climate_prcp_year_sum %>% 
   kable(col.names = c("Year",
                       "Largest Rain Event",
                       "Smallest Rain Event",
-                      "Average Rainfall",
+                      "Total Rainfall",
                       "Largest Snow Event",
                       "Smallest Snow Event",
-                      "Average Snowfall",
+                      "Total Snowfall",
                       "Largest Precipitation Event",
                       "Smallest Precipitation Event",
-                      "Average Precipitation")) %>% 
-  kable_styling(position = "center", bootstrap_options = "striped")
-
-precip_graph_df <- climate_prcp_year_sum %>% 
-  select(year, all_prcp_mean)
-
-ggplot(precip_graph_df, 
-       aes(x = year, y = all_prcp_mean)) +
-  geom_line()
+                      "Total Precipitation"),
+        "html",
+        escape = F) %>% 
+  kable_styling(position = "center", bootstrap_options = c("striped", "hover"), full_width = F) %>% 
+  row_spec(1:10, extra_css = "display: none;")
 ```
 
-## Temperature
+### Over Total Time Period {.tabset}
+
+#### Linear Model
 
 ```{r}
+ggplot(climate_prcp_year_sum, 
+       aes(x = year, y = total_all_prcp)) +
+  geom_point(color = "blue") +
+  geom_smooth(formula = y ~ x,
+              color = "black",
+              method = "lm",
+              se = FALSE) +
+  scale_y_continuous(limits = c(min(climate_prcp_year_sum$total_all_prcp), max(climate_prcp_year_sum$total_all_prcp)))
+
+# trend line slope
+precip_lm <- lm(total_all_prcp ~ year, data = climate_prcp_year_sum)
+confint(precip_lm, "year", level = 0.95)
+
+ggplot(data = climate_prcp_year_sum,
+       aes(x = year, y = total_all_prcp)) +
+  stat_summary(fun = "mean", 
+               geom = "point", 
+               color = "blue") +
+  geom_smooth(method = "lm",
+              color = "black",
+              se = FALSE)
+```
+
+#### Mann-Kendall
+
+```{r}
+MannKendall(climate_prcp_year_sum$total_all_prcp)
+```
+
+### Between Time Periods {.tabset}
+
+```{r}
+climate_prcp_91_24 <- climate_prcp_year_sum %>% 
+  filter(year %in% 1891:1924) %>% 
+  mutate(year = as.numeric(year))
+
+climate_prcp_25_58 <- climate_prcp_year_sum %>% 
+  filter(year %in% 1925:1958)
+
+climate_prcp_59_92 <- climate_prcp_year_sum %>% 
+  filter(year %in% 1959:1992)
+
+climate_prcp_93_23 <- climate_prcp_year_sum %>% 
+  filter(year %in% 1993:2023)
+```
+
+#### Rank-Sum Test
+
+```{r}
+wilcox.test(subset(climate_prcp_year_sum$total_all_prcp, climate_prcp_year_sum$year %in% 1891:1924),
+            subset(climate_prcp_year_sum$total_all_prcp, climate_prcp_year_sum$year %in% 1925:1958))
+
+wilcox.test(subset(climate_prcp_year_sum$total_all_prcp, climate_prcp_year_sum$year %in% 1959:1992),
+            subset(climate_prcp_year_sum$total_all_prcp, climate_prcp_year_sum$year %in% 1993:2023))
+```
+
+## Temperature {.tabset}
+
+```{r, include=FALSE}
+# summary data
 climate_temp_year_sum <- climate %>% 
   group_by(year) %>% 
   summarize(max_high_temp = max(tmax),
@@ -146,6 +211,10 @@ climate_temp_year_sum <- climate %>%
             min_low_temp = min(tmin),
             mean_low_temp = mean(tmin))
 
+climate_temp_year_sum <- climate_temp_year_sum %>% 
+  mutate(year = as.numeric(year))
+
+# table summarizing the data
 climate_temp_year_sum %>% 
   kable(col.names = c("Year",
                       "Largest High Temperature",
@@ -157,33 +226,520 @@ climate_temp_year_sum %>%
   kable_styling(position = "center", bootstrap_options = "striped")
 ```
 
-# Seasonal Trends {.tabset}
+### Overall Time Period {.tabset}
 
-## Precipitation (Rain and Snow)
+#### Linear Model
 
 ```{r}
+# graph plotting the average high and low temperatures each year with trend lines
+ggplot(climate_temp_year_sum) +
+  geom_point(aes(x = year, y = mean_high_temp), 
+             color = "red") +
+  geom_smooth(aes(x = year, y = mean_high_temp), 
+              formula = y ~ x, 
+              color = "black", 
+              method = "lm",
+              se = FALSE) +
+  geom_point(aes(x = year, y = mean_low_temp), 
+             color = "blue") +
+  geom_smooth(aes(x = year, y = mean_low_temp),
+              formula = y ~ x, 
+              color = "black",
+              method = "lm",
+              se = FALSE)
 
+# trend line slopes
+high_temp_lm <- lm(mean_high_temp ~ year, data = climate_temp_year_sum)
+summary(high_temp_lm)
+confint(high_temp_lm, "year", level = 0.95)
+
+low_temp_lm <- lm(mean_low_temp ~ year, data = climate_temp_year_sum)
+summary(low_temp_lm)
+confint(low_temp_lm, "year", level = 0.95)
+
+ggplot(data = climate_temp_year_sum, 
+       aes(x = year, y = mean_high_temp)) +
+  stat_summary(fun = "mean", 
+               geom = "point", 
+               color = "red") +
+  geom_smooth(method = "lm",
+              color = "black",
+              se = FALSE)
+
+ggplot(data = climate_temp_year_sum, 
+       aes(x = year, y = mean_low_temp)) +
+  stat_summary(fun = "mean", 
+               geom = "point", 
+               color = "blue") +
+  geom_smooth(method = "lm",
+              color = "black",
+              se = FALSE)
 ```
 
+#### Mann-Kendall
 
+```{r}
+# Mann Kendall method for average high temperature
+MannKendall(climate_temp_year_sum$mean_high_temp)
 
+# Mann Kendall method for average low temperature
+MannKendall(climate_temp_year_sum$mean_low_temp)
+```
 
+### Between Time Periods {.tabset}
 
+```{r}
+climate_temp_91_24 <- climate_temp_year_sum %>% 
+  filter(year %in% 1891:1924)
 
+climate_temp_25_58 <- climate_temp_year_sum %>% 
+  filter(year %in% 1925:1958)
 
+climate_temp_59_92 <- climate_temp_year_sum %>% 
+  filter(year %in% 1959:1992)
 
+climate_temp_93_23 <- climate_temp_year_sum %>% 
+  filter(year %in% 1993:2023)
+```
 
+#### Rank-Sum Test
 
+```{r}
+# Average High Temperature Rank-Sum Test
+wilcox.test(subset(climate_temp_year_sum$mean_high_temp, climate_temp_year_sum$year %in% 1891:1924),
+            subset(climate_temp_year_sum$mean_high_temp, climate_temp_year_sum$year %in% 1925:1958))
 
+wilcox.test(subset(climate_temp_year_sum$mean_high_temp, climate_temp_year_sum$year %in% 1959:1992),
+            subset(climate_temp_year_sum$mean_high_temp, climate_temp_year_sum$year %in% 1993:2023))
 
+wilcox.test(subset(climate_temp_year_sum$mean_high_temp, climate_temp_year_sum$year %in% 1891:1924),
+            subset(climate_temp_year_sum$mean_high_temp, climate_temp_year_sum$year %in% 1993:2023))
 
+# Average Low Temperature Rank-Sum Test
+wilcox.test(subset(climate_temp_year_sum$mean_low_temp, climate_temp_year_sum$year %in% 1891:1924),
+            subset(climate_temp_year_sum$mean_low_temp, climate_temp_year_sum$year %in% 1925:1958))
 
+wilcox.test(subset(climate_temp_year_sum$mean_low_temp, climate_temp_year_sum$year %in% 1959:1992),
+            subset(climate_temp_year_sum$mean_low_temp, climate_temp_year_sum$year %in% 1993:2023))
 
+wilcox.test(subset(climate_temp_year_sum$mean_low_temp, climate_temp_year_sum$year %in% 1891:1924),
+            subset(climate_temp_year_sum$mean_low_temp, climate_temp_year_sum$year %in% 1993:2023))
+```
 
+# Seasonal Trends {.tabset}
 
+## Precipitation (Rain and Snow) {.tabset}
 
+```{r, include=FALSE}
+climate_prcp_season <- climate %>% 
+  group_by(year, season) %>% 
+  summarize(most_rain = max(prcp),
+            least_rain = min(prcp),
+            total_rain = sum(prcp),
+            most_snow = max(snow),
+            least_snow = min(snow),
+            total_snow = sum(snow),
+            most_all_prcp = max(all_prcp),
+            least_all_prcp = min(all_prcp),
+            total_all_prcp = total_snow + total_rain)
 
+climate_prcp_season <- climate_prcp_season %>% 
+  mutate(year = as.numeric(year))
 
+climate_prcp_season %>% 
+  kable(col.names = c("Year",
+                      "Season",
+                      "Largest Rain Event",
+                      "Smallest Rain Event",
+                      "Total Rainfall",
+                      "Largest Snow Event",
+                      "Smallest Snow Event",
+                      "Total Snowfall",
+                      "Largest Precipitation Event",
+                      "Smallest Precipitation Event",
+                      "Total Precipitation")) %>% 
+  kable_styling(position = "center", bootstrap_options = "striped")
+```
 
+### Summer {.tabset}
 
+```{r}
+clim_prcp_summer <- climate_prcp_season %>% 
+  filter(season == "summer")
+```
 
+#### Overall Time Period {.tabset}
+
+##### Linear Model
+
+```{r}
+ggplot(clim_prcp_summer, 
+       aes(x = year, y = total_all_prcp)) +
+  geom_point(color = "blue") +
+  geom_smooth(formula = y ~ x,
+              color = "black",
+              method = "lm",
+              se = FALSE)
+
+# trend line slope
+prcp_summer_lm <- lm(total_all_prcp ~ year, data = clim_prcp_summer)
+confint(prcp_summer_lm, "year", level = 0.95)
+
+ggplot(data = clim_prcp_summer,
+       aes(x = year, y = total_all_prcp)) +
+  stat_summary(fun = "mean", 
+               geom = "point", 
+               color = "blue") +
+  geom_smooth(method = "lm",
+              color = "black",
+              se = FALSE)
+```
+
+##### Mann-Kendall
+
+```{r}
+MannKendall(clim_prcp_summer$total_all_prcp)
+```
+
+#### Between Time Periods {.tabset}
+
+```{r}
+clim_prcp_summer_91_24 <- clim_prcp_summer %>% 
+  filter(year %in% 1891:1924)
+
+clim_prcp_summer_25_58 <- clim_prcp_summer %>% 
+  filter(year %in% 1925:1958)
+
+clim_prcp_summer_59_92 <- clim_prcp_summer %>% 
+  filter(year %in% 1959:1992)
+
+clim_prcp_summer_93_23 <- clim_prcp_summer %>% 
+  filter(year %in% 1993:2023)
+```
+
+##### Rank-Sum Test
+
+```{r}
+wilcox.test(subset(clim_prcp_summer$total_all_prcp, clim_prcp_summer$year %in% 1891:1924),
+            subset(clim_prcp_summer$total_all_prcp, clim_prcp_summer$year %in% 1925:1958))
+
+wilcox.test(subset(clim_prcp_summer$total_all_prcp, clim_prcp_summer$year %in% 1959:1992),
+            subset(clim_prcp_summer$total_all_prcp, clim_prcp_summer$year %in% 1993:2023))
+
+wilcox.test(subset(clim_prcp_summer$total_all_prcp, clim_prcp_summer$year %in% 1891:1924),
+            subset(clim_prcp_summer$total_all_prcp, clim_prcp_summer$year %in% 1993:2023))
+```
+
+### Winter {.tabset}
+
+```{r}
+clim_prcp_winter <- climate_prcp_season %>% 
+  filter(season == "winter")
+```
+
+#### Overall Time Period {.tabset}
+
+##### Linear Model
+
+```{r}
+ggplot(clim_prcp_winter, 
+       aes(x = year, y = total_all_prcp)) +
+  geom_point(color = "blue") +
+  geom_smooth(formula = y ~ x,
+              color = "black",
+              method = "lm",
+              se = FALSE)
+
+# trend line slope
+prcp_winter_lm <- lm(total_all_prcp ~ year, data = clim_prcp_winter)
+confint(prcp_winter_lm, "year", level = 0.95)
+
+ggplot(data = clim_prcp_winter,
+       aes(x = year, y = total_all_prcp)) +
+  stat_summary(fun = "mean", 
+               geom = "point", 
+               color = "blue") +
+  geom_smooth(method = "lm",
+              color = "black",
+              se = FALSE)
+```
+
+##### Mann-Kendall
+
+```{r}
+MannKendall(clim_prcp_winter$total_all_prcp)
+```
+
+#### Between Time Periods {.tabset}
+
+```{r}
+clim_prcp_winter_91_24 <- clim_prcp_winter %>% 
+  filter(year %in% 1891:1924)
+
+clim_prcp_winter_25_58 <- clim_prcp_winter %>% 
+  filter(year %in% 1925:1958)
+
+clim_prcp_winter_59_92 <- clim_prcp_winter %>% 
+  filter(year %in% 1959:1992)
+
+clim_prcp_winter_93_23 <- clim_prcp_winter %>% 
+  filter(year %in% 1993:2023)
+```
+
+##### Rank-Sum Test
+
+```{r}
+wilcox.test(subset(clim_prcp_winter$total_all_prcp, clim_prcp_winter$year %in% 1891:1924),
+            subset(clim_prcp_winter$total_all_prcp, clim_prcp_winter$year %in% 1925:1958))
+
+wilcox.test(subset(clim_prcp_winter$total_all_prcp, clim_prcp_winter$year %in% 1959:1992),
+            subset(clim_prcp_winter$total_all_prcp, clim_prcp_winter$year %in% 1993:2023))
+
+wilcox.test(subset(clim_prcp_winter$total_all_prcp, clim_prcp_winter$year %in% 1891:1924),
+            subset(clim_prcp_winter$total_all_prcp, clim_prcp_winter$year %in% 1993:2023))
+```
+
+## Temperature {.tabset}
+
+```{r, include=FALSE}
+# summary data
+climate_temp_season <- climate %>% 
+  group_by(year, season) %>% 
+  summarize(max_high_temp = max(tmax),
+            min_high_temp = min(tmax),
+            mean_high_temp = mean(tmax),
+            max_low_temp = max(tmin),
+            min_low_temp = min(tmin),
+            mean_low_temp = mean(tmin))
+
+climate_temp_year_sum <- climate_temp_year_sum %>% 
+  mutate(year = as.numeric(year))
+
+# table summarizing the data
+climate_temp_season %>% 
+  kable(col.names = c("Year",
+                      "Season",
+                      "Largest High Temperature",
+                      "Smallest High Temperature",
+                      "Mean High Temperature",
+                      "Largest Low Temperature",
+                      "Smallest Low Temperature",
+                      "Mean Low Temperature")) %>% 
+  kable_styling(position = "center", bootstrap_options = "striped")
+```
+
+### Summer {.tabset}
+
+```{r}
+clim_temp_summer <- climate_temp_season %>% 
+  filter(season == "summer") %>% 
+  mutate(year = as.numeric(year))
+```
+
+#### Overall Time Period {.tabset}
+
+##### Linear Model
+
+```{r}
+# graph plotting the average high and low temperatures each year with trend lines
+ggplot(clim_temp_summer) +
+  geom_point(aes(x = year, y = mean_high_temp), 
+             color = "red") +
+  geom_smooth(aes(x = year, y = mean_high_temp), 
+              formula = y ~ x, 
+              color = "black", 
+              method = "lm",
+              se = FALSE) +
+  geom_point(aes(x = year, y = mean_low_temp), 
+             color = "blue") +
+  geom_smooth(aes(x = year, y = mean_low_temp),
+              formula = y ~ x, 
+              color = "black",
+              method = "lm",
+              se = FALSE)
+
+# trend line slopes
+high_temp_summer_lm <- lm(mean_high_temp ~ year, data = clim_temp_summer)
+summary(high_temp_summer_lm)
+confint(high_temp_summer_lm, "year", level = 0.95)
+
+low_temp_summer_lm <- lm(mean_low_temp ~ year, data = clim_temp_summer)
+summary(low_temp_summer_lm)
+confint(low_temp_summer_lm, "year", level = 0.95)
+
+ggplot(data = clim_temp_summer, 
+       aes(x = year, y = mean_high_temp)) +
+  stat_summary(fun = "mean", 
+               geom = "point", 
+               color = "red") +
+  geom_smooth(method = "lm",
+              color = "black",
+              se = FALSE)
+
+ggplot(data = clim_temp_summer, 
+       aes(x = year, y = mean_low_temp)) +
+  stat_summary(fun = "mean", 
+               geom = "point", 
+               color = "blue") +
+  geom_smooth(method = "lm",
+              color = "black",
+              se = FALSE)
+```
+
+#### Mann-Kendall
+
+```{r}
+# Mann Kendall method for average high temperature
+MannKendall(clim_temp_summer$mean_high_temp)
+
+# Mann Kendall method for average low temperature
+MannKendall(clim_temp_summer$mean_low_temp)
+```
+
+### Between Time Periods {.tabset}
+
+```{r}
+climate_temp_summer_91_24 <- clim_temp_summer %>% 
+  filter(year %in% 1891:1924)
+
+climate_temp_summer_25_58 <- clim_temp_summer %>% 
+  filter(year %in% 1925:1958)
+
+climate_temp_summer_59_92 <- clim_temp_summer %>% 
+  filter(year %in% 1959:1992)
+
+climate_temp_summer_93_23 <- clim_temp_summer %>% 
+  filter(year %in% 1993:2023)
+```
+
+#### Rank-Sum Test
+
+```{r}
+# Average High Temperature Rank-Sum Test
+wilcox.test(subset(clim_temp_summer$mean_high_temp, clim_temp_summer$year %in% 1891:1924),
+            subset(clim_temp_summer$mean_high_temp, clim_temp_summer$year %in% 1925:1958))
+
+wilcox.test(subset(clim_temp_summer$mean_high_temp, clim_temp_summer$year %in% 1959:1992),
+            subset(clim_temp_summer$mean_high_temp, clim_temp_summer$year %in% 1993:2023))
+
+wilcox.test(subset(clim_temp_summer$mean_high_temp, clim_temp_summer$year %in% 1891:1924),
+            subset(clim_temp_summer$mean_high_temp, clim_temp_summer$year %in% 1993:2023))
+
+# Average Low Temperature Rank-Sum Test
+wilcox.test(subset(clim_temp_summer$mean_low_temp, clim_temp_summer$year %in% 1891:1924),
+            subset(clim_temp_summer$mean_low_temp, clim_temp_summer$year %in% 1925:1958))
+
+wilcox.test(subset(clim_temp_summer$mean_low_temp, clim_temp_summer$year %in% 1959:1992),
+            subset(clim_temp_summer$mean_low_temp, clim_temp_summer$year %in% 1993:2023))
+
+wilcox.test(subset(clim_temp_summer$mean_low_temp, clim_temp_summer$year %in% 1891:1924),
+            subset(clim_temp_summer$mean_low_temp, clim_temp_summer$year %in% 1993:2023))
+```
+
+### Winter {.tabset}
+
+```{r}
+clim_temp_winter <- climate_temp_season %>% 
+  filter(season == "winter") %>% 
+  mutate(year = as.numeric(year))
+```
+
+#### Overall Time Period {.tabset}
+
+##### Linear Model
+
+```{r}
+# graph plotting the average high and low temperatures each year with trend lines
+ggplot(clim_temp_winter) +
+  geom_point(aes(x = year, y = mean_high_temp), 
+             color = "red") +
+  geom_smooth(aes(x = year, y = mean_high_temp), 
+              formula = y ~ x, 
+              color = "black", 
+              method = "lm",
+              se = FALSE) +
+  geom_point(aes(x = year, y = mean_low_temp), 
+             color = "blue") +
+  geom_smooth(aes(x = year, y = mean_low_temp),
+              formula = y ~ x, 
+              color = "black",
+              method = "lm",
+              se = FALSE)
+
+# trend line slopes
+high_temp_winter_lm <- lm(mean_high_temp ~ year, data = clim_temp_winter)
+summary(high_temp_winter_lm)
+confint(high_temp_winter_lm, "year", level = 0.95)
+
+low_temp_winter_lm <- lm(mean_low_temp ~ year, data = clim_temp_winter)
+summary(low_temp_winter_lm)
+confint(low_temp_winter_lm, "year", level = 0.95)
+
+ggplot(data = clim_temp_winter, 
+       aes(x = year, y = mean_high_temp)) +
+  stat_summary(fun = "mean", 
+               geom = "point", 
+               color = "red") +
+  geom_smooth(method = "lm",
+              color = "black",
+              se = FALSE)
+
+ggplot(data = clim_temp_winter, 
+       aes(x = year, y = mean_low_temp)) +
+  stat_summary(fun = "mean", 
+               geom = "point", 
+               color = "blue") +
+  geom_smooth(method = "lm",
+              color = "black",
+              se = FALSE)
+```
+
+#### Mann-Kendall
+
+```{r}
+# Mann Kendall method for average high temperature
+MannKendall(clim_temp_winter$mean_high_temp)
+
+# Mann Kendall method for average low temperature
+MannKendall(clim_temp_winter$mean_low_temp)
+```
+
+### Between Time Periods {.tabset}
+
+```{r}
+climate_temp_winter_91_24 <- clim_temp_winter %>% 
+  filter(year %in% 1891:1924)
+
+climate_temp_winter_25_58 <- clim_temp_winter %>% 
+  filter(year %in% 1925:1958)
+
+climate_temp_winter_59_92 <- clim_temp_winter %>% 
+  filter(year %in% 1959:1992)
+
+climate_temp_winter_93_23 <- clim_temp_winter %>% 
+  filter(year %in% 1993:2023)
+```
+
+#### Rank-Sum Test
+
+```{r}
+# Average High Temperature Rank-Sum Test
+wilcox.test(subset(clim_temp_winter$mean_high_temp, clim_temp_winter$year %in% 1891:1924),
+            subset(clim_temp_winter$mean_high_temp, clim_temp_winter$year %in% 1925:1958))
+
+wilcox.test(subset(clim_temp_winter$mean_high_temp, clim_temp_winter$year %in% 1959:1992),
+            subset(clim_temp_winter$mean_high_temp, clim_temp_winter$year %in% 1993:2023))
+
+wilcox.test(subset(clim_temp_winter$mean_high_temp, clim_temp_winter$year %in% 1891:1924),
+            subset(clim_temp_winter$mean_high_temp, clim_temp_winter$year %in% 1993:2023))
+
+# Average Low Temperature Rank-Sum Test
+wilcox.test(subset(clim_temp_winter$mean_low_temp, clim_temp_winter$year %in% 1891:1924),
+            subset(clim_temp_winter$mean_low_temp, clim_temp_winter$year %in% 1925:1958))
+
+wilcox.test(subset(clim_temp_winter$mean_low_temp, clim_temp_winter$year %in% 1959:1992),
+            subset(clim_temp_winter$mean_low_temp, clim_temp_winter$year %in% 1993:2023))
+
+wilcox.test(subset(clim_temp_winter$mean_low_temp, clim_temp_winter$year %in% 1891:1924),
+            subset(clim_temp_winter$mean_low_temp, clim_temp_winter$year %in% 1993:2023))
+```

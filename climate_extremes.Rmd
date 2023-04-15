@@ -1,0 +1,149 @@
+---
+title: "Ann Arbor Climate Extremes"
+author: "Kiera Matiska"
+date: "2023-04-15"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(tidyverse)
+library(here)
+library(janitor)
+library(Kendall)
+library(lubridate)
+library(zoo)
+library(scales)
+```
+
+## Read in Data
+
+```{r}
+climate_clean <- read_csv(here("data", "A2_climate_data.csv")) %>% 
+  clean_names()
+
+climate <- climate_clean %>% 
+  mutate(date = ymd(date)) %>% 
+  mutate(year = substr(date, 1, 4)) %>% 
+  mutate(month = substr(date, 6, 7)) %>% 
+  mutate(day = substr(date, 9, 10)) %>% 
+  mutate(season = case_when(
+    month == "01" ~ "winter",
+    month == "02" ~ "winter",
+    month == "03" ~ "winter",
+    month == "04" ~ "spring",
+    month == "05" ~ "spring",
+    month == "06" ~ "spring",
+    month == "07" ~ "summer",
+    month == "08" ~ "summer",
+    month == "09" ~ "summer",
+    month == "10" ~ "fall",
+    month == "11" ~ "fall",
+    month == "12" ~ "fall"
+  ))
+```
+
+```{r, include=FALSE}
+# fill in missing data
+
+# precipitation and snow
+climate$prcp[is.na(climate$prcp)] <- 0
+
+climate$snow[is.na(climate$snow)] <- 0
+
+# Maximum and Minimum Temperature
+climate$tmax <- na.locf(na.locf(climate$tmax), fromLast = TRUE)
+
+climate$tmin <- na.locf(na.locf(climate$tmin), fromLast = TRUE)
+
+# Add precipitation and snow together for all precipitation
+climate <- climate %>% 
+  mutate(all_prcp = prcp + snow)
+```
+
+The temperature range in Ann Arbor, MI is normally 17°F to 84°F. I am going to use those two numbers, anything below the low and above the high, for my extremes analysis. Any day that has precipitation - including both rain or snow - above 1.25" is likely to have a large flood event.
+
+# Extreme Metrics {.tabset}
+
+## Temperature {.tabset}
+
+### Extreme Cold Days
+
+```{r}
+climate$freeze <- ifelse(climate$tmin <= 17, 1, 0)
+
+clim_fr_sum <- climate %>% 
+  group_by(year) %>% 
+  summarize(freeze_days = sum(freeze)) %>% 
+  mutate(year = as.numeric(year))
+
+ggplot(data = clim_fr_sum,
+       aes(x = year, y = freeze_days)) +
+  geom_point(color = "blue") +
+  geom_smooth(formula = y ~ x,
+              color = "black",
+              method = "lm",
+              se = FALSE)
+
+freeze_lm <- lm(freeze_days ~ year, data = clim_fr_sum)
+summary(freeze_lm)
+```
+
+The y-intercept value stands at `r round(freeze_lm$coefficients[1], 2)` days. The slope for freeze days per year is `r round(freeze_lm$coefficients[2], 3)` and is statistically significant with a p-value of 5.82e-06.
+
+### Extreme Hot Days
+
+```{r}
+climate$heat <- ifelse(climate$tmax >= 84, 1, 0)
+
+clim_ht_sum <- climate %>% 
+  group_by(year) %>% 
+  summarize(heat_days = sum(heat)) %>% 
+  mutate(year = as.numeric(year))
+
+ggplot(data = clim_ht_sum, 
+       aes(x = year, y = heat_days)) +
+  geom_point(color = "red") +
+  geom_smooth(formula = y ~ x,
+              color = "black",
+              method = "lm",
+              se = FALSE)
+
+heat_lm <- lm(heat_days ~ year, data = clim_ht_sum)
+summary(heat_lm)
+```
+
+The y-intercept value stands at `r round(heat_lm$coefficients[1], 2)` days. The slope for heat days per year is `r round(heat_lm$coefficients[2], 3)` and is not statistically significant with a p-value of 0.14.
+
+### Precipitation
+
+```{r}
+climate$precip <- ifelse(climate$all_prcp >= 1.25, 1, 0)
+
+clim_prcp_sum <- climate %>% 
+  group_by(year) %>% 
+  summarize(high_precip_days = sum(precip)) %>% 
+  mutate(year = as.numeric(year))
+
+ggplot(data = clim_prcp_sum, 
+       aes(x = year, y = high_precip_days)) +
+  geom_point(color = "blue") +
+  geom_smooth(formula = y ~ x,
+              color = "black",
+              method = "lm",
+              se = FALSE)
+
+all_precip_lm <- lm(high_precip_days ~ year, data = clim_prcp_sum)
+summary(all_precip_lm)
+```
+
+The y-intercept value stands at `r round(all_precip_lm$coefficients[1], 2)` days. The slope for extreme precipitation days per year is `r round(all_precip_lm$coefficients[2], 3)` and is statistically significant with a p-value of 2.36e-10.
+
+# Data
+
+Great Lakes Integrated Sciences + Assessments (GLISA). (2021). Ann Arbor, MI Climatology [PDF]. Retrieved April 15, 2023, from https://glisa.umich.edu/wp-content/uploads/2021/02/AnnArborMI_Climatology.pdf
+
+NOAA. (2023). Daily Summaries at the Ann Arbor University of Michigan Station. NOAA. https://www.ncei.noaa.gov/cdo-web/datasets/GHCND/stations/GHCND:USC00200230/detail
+
+WeatherSpark. (n.d.). Average Weather in Ann Arbor, Michigan, United States, Year Round. Retrieved April 15, 2023, from https://weatherspark.com/y/16511/Average-Weather-in-Ann-Arbor-Michigan-United-States-Year-Round
