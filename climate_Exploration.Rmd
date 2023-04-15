@@ -82,9 +82,9 @@ ggplot(climate,
   geom_line()
 ```
 
-# Fill in Missing Data
+```{r, include=FALSE}
+# Fill in missing data
 
-```{r}
 # precipitation and snow
 climate$prcp[is.na(climate$prcp)] <- 0
 
@@ -115,26 +115,8 @@ climate_prcp_year_sum <- climate %>%
             total_snow = sum(snow),
             most_all_prcp = max(all_prcp),
             least_all_prcp = min(all_prcp),
-            total_all_prcp = total_snow + total_rain)
-
-climate_prcp_year_sum <- climate_prcp_year_sum %>% 
+            total_all_prcp = total_snow + total_rain) %>% 
   mutate(year = as.numeric(year))
-
-climate_prcp_year_sum %>% 
-  kable(col.names = c("Year",
-                      "Largest Rain Event",
-                      "Smallest Rain Event",
-                      "Total Rainfall",
-                      "Largest Snow Event",
-                      "Smallest Snow Event",
-                      "Total Snowfall",
-                      "Largest Precipitation Event",
-                      "Smallest Precipitation Event",
-                      "Total Precipitation"),
-        "html",
-        escape = F) %>% 
-  kable_styling(position = "center", bootstrap_options = c("striped", "hover"), full_width = F) %>% 
-  row_spec(1:10, extra_css = "display: none;")
 ```
 
 ### Over Total Time Period {.tabset}
@@ -142,18 +124,17 @@ climate_prcp_year_sum %>%
 #### Linear Model
 
 ```{r}
-ggplot(climate_prcp_year_sum, 
-       aes(x = year, y = total_all_prcp)) +
-  geom_point(color = "blue") +
-  geom_smooth(formula = y ~ x,
-              color = "black",
-              method = "lm",
-              se = FALSE) +
-  scale_y_continuous(limits = c(min(climate_prcp_year_sum$total_all_prcp), max(climate_prcp_year_sum$total_all_prcp)))
+# ggplot(climate_prcp_year_sum, 
+#        aes(x = year, y = total_all_prcp)) +
+#   geom_point(color = "blue") +
+#   geom_smooth(formula = y ~ x,
+#               color = "black",
+#               method = "lm",
+#               se = FALSE)
 
 # trend line slope
 precip_lm <- lm(total_all_prcp ~ year, data = climate_prcp_year_sum)
-confint(precip_lm, "year", level = 0.95)
+precip_confint <- confint(precip_lm, "year", level = 0.95)
 
 ggplot(data = climate_prcp_year_sum,
        aes(x = year, y = total_all_prcp)) +
@@ -165,15 +146,19 @@ ggplot(data = climate_prcp_year_sum,
               se = FALSE)
 ```
 
+The y-intercept value stands at `r round(precip_lm$coefficients[1], 2)` inches. The slope for precipitation by year is `r round(precip_lm$coefficients[2], 3)` and is statistically significant with a p-value of 2.09e-09.
+
 #### Mann-Kendall
 
 ```{r}
-MannKendall(climate_prcp_year_sum$total_all_prcp)
+prcp_mk <- MannKendall(climate_prcp_year_sum$total_all_prcp)
 ```
+
+The strength of the trend is 0.343 and is statistically significant with a p-value of 2.22e-16.
 
 ### Between Time Periods {.tabset}
 
-```{r}
+```{r, include=FALSE}
 climate_prcp_91_24 <- climate_prcp_year_sum %>% 
   filter(year %in% 1891:1924) %>% 
   mutate(year = as.numeric(year))
@@ -191,12 +176,21 @@ climate_prcp_93_23 <- climate_prcp_year_sum %>%
 #### Rank-Sum Test
 
 ```{r}
-wilcox.test(subset(climate_prcp_year_sum$total_all_prcp, climate_prcp_year_sum$year %in% 1891:1924),
-            subset(climate_prcp_year_sum$total_all_prcp, climate_prcp_year_sum$year %in% 1925:1958))
+prcp_91_58_rs <- wilcox.test(subset(climate_prcp_year_sum$total_all_prcp, climate_prcp_year_sum$year %in% 1891:1924),
+                             subset(climate_prcp_year_sum$total_all_prcp, climate_prcp_year_sum$year %in% 1925:1958))
 
-wilcox.test(subset(climate_prcp_year_sum$total_all_prcp, climate_prcp_year_sum$year %in% 1959:1992),
-            subset(climate_prcp_year_sum$total_all_prcp, climate_prcp_year_sum$year %in% 1993:2023))
+prcp_59_23_rs <- wilcox.test(subset(climate_prcp_year_sum$total_all_prcp, climate_prcp_year_sum$year %in% 1959:1992),
+                             subset(climate_prcp_year_sum$total_all_prcp, climate_prcp_year_sum$year %in% 1993:2023))
+
+prcp_91_23_rs <- wilcox.test(subset(climate_prcp_year_sum$total_all_prcp, climate_prcp_year_sum$year %in% 1891:1924),
+                             subset(climate_prcp_year_sum$total_all_prcp, climate_prcp_year_sum$year %in% 1993:2023))
 ```
+
+Comparing the years 1891-1924 *and* 1925-1958, the rank-sum test did yield statistically significant differences in the means with a p-value of 0.023.
+
+Comparing the years 1959-1992 *and* 1993-2023, the rank-sum test did yield statistically significant differences in the means with a p-value of 1.72e-06.
+
+Comparing the years 1891-1924 *and* 1993-2023, the rank-sum test did yield statistically significant differences in the means with a p-value of 4.13e-08.
 
 ## Temperature {.tabset}
 
@@ -209,21 +203,8 @@ climate_temp_year_sum <- climate %>%
             mean_high_temp = mean(tmax),
             max_low_temp = max(tmin),
             min_low_temp = min(tmin),
-            mean_low_temp = mean(tmin))
-
-climate_temp_year_sum <- climate_temp_year_sum %>% 
+            mean_low_temp = mean(tmin)) %>% 
   mutate(year = as.numeric(year))
-
-# table summarizing the data
-climate_temp_year_sum %>% 
-  kable(col.names = c("Year",
-                      "Largest High Temperature",
-                      "Smallest High Temperature",
-                      "Mean High Temperature",
-                      "Largest Low Temperature",
-                      "Smallest Low Temperature",
-                      "Mean Low Temperature")) %>% 
-  kable_styling(position = "center", bootstrap_options = "striped")
 ```
 
 ### Overall Time Period {.tabset}
@@ -232,63 +213,69 @@ climate_temp_year_sum %>%
 
 ```{r}
 # graph plotting the average high and low temperatures each year with trend lines
-ggplot(climate_temp_year_sum) +
-  geom_point(aes(x = year, y = mean_high_temp), 
-             color = "red") +
-  geom_smooth(aes(x = year, y = mean_high_temp), 
-              formula = y ~ x, 
-              color = "black", 
-              method = "lm",
-              se = FALSE) +
-  geom_point(aes(x = year, y = mean_low_temp), 
-             color = "blue") +
-  geom_smooth(aes(x = year, y = mean_low_temp),
-              formula = y ~ x, 
-              color = "black",
-              method = "lm",
-              se = FALSE)
+# ggplot(climate_temp_year_sum) +
+#   geom_point(aes(x = year, y = mean_high_temp), 
+#              color = "red") +
+#   geom_smooth(aes(x = year, y = mean_high_temp), 
+#               formula = y ~ x, 
+#               color = "black", 
+#               method = "lm",
+#               se = FALSE) +
+#   geom_point(aes(x = year, y = mean_low_temp), 
+#              color = "blue") +
+#   geom_smooth(aes(x = year, y = mean_low_temp),
+#               formula = y ~ x, 
+#               color = "black",
+#               method = "lm",
+#               se = FALSE)
 
 # trend line slopes
-high_temp_lm <- lm(mean_high_temp ~ year, data = climate_temp_year_sum)
-summary(high_temp_lm)
-confint(high_temp_lm, "year", level = 0.95)
+t_high_lm <- lm(mean_high_temp ~ year, data = climate_temp_year_sum)
+t_high_confint <- confint(t_high_lm, "year", level = 0.95)
 
-low_temp_lm <- lm(mean_low_temp ~ year, data = climate_temp_year_sum)
-summary(low_temp_lm)
-confint(low_temp_lm, "year", level = 0.95)
+t_low_lm <- lm(mean_low_temp ~ year, data = climate_temp_year_sum)
+t_low_confint <- confint(t_low_lm, "year", level = 0.95)
 
-ggplot(data = climate_temp_year_sum, 
-       aes(x = year, y = mean_high_temp)) +
-  stat_summary(fun = "mean", 
-               geom = "point", 
+ggplot(data = climate_temp_year_sum) +
+  stat_summary(aes(x = year, y = mean_high_temp),
+               fun = "mean",
+               geom = "point",
                color = "red") +
-  geom_smooth(method = "lm",
-              color = "black",
-              se = FALSE)
-
-ggplot(data = climate_temp_year_sum, 
-       aes(x = year, y = mean_low_temp)) +
-  stat_summary(fun = "mean", 
-               geom = "point", 
+  stat_summary(aes(x = year, y = mean_low_temp),
+               fun = "mean",
+               geom = "point",
                color = "blue") +
-  geom_smooth(method = "lm",
-              color = "black",
+  geom_smooth(aes(x = year, y = mean_high_temp),
+              method = "lm",
+              color = "darkred",
+              se = FALSE) +
+  geom_smooth(aes(x = year, y = mean_low_temp),
+              method = "lm",
+              color = "darkblue",
               se = FALSE)
 ```
+
+For average high temperatures, the y-intercept is `r round(t_high_lm$coefficients[1], 2)`. The slope for average high temperature per year is `r round(t_high_lm$coefficients[2], 2)` and is statistically significant with a p-value of 5.78e-05.
+
+For average low temperatures, they y-intercept is `r round(t_low_lm$coefficients[1], 2)`. The slope for average low temperature per year is `r round(t_low_lm$coefficients[2], 2)` and is statistically significant with a p-value of 4.28e-05.
 
 #### Mann-Kendall
 
 ```{r}
 # Mann Kendall method for average high temperature
-MannKendall(climate_temp_year_sum$mean_high_temp)
+temp_high_mk <- MannKendall(climate_temp_year_sum$mean_high_temp)
 
 # Mann Kendall method for average low temperature
-MannKendall(climate_temp_year_sum$mean_low_temp)
+temp_low_mk <- MannKendall(climate_temp_year_sum$mean_low_temp)
 ```
+
+For average high temperatures, the strength of the trend is 0.32 and is statistically significant with a p-value of 2.22e-16.
+
+For average low temperatures, the strength of the trend is 0.34 and is statistically significant with a p-value of 2.22e-16.
 
 ### Between Time Periods {.tabset}
 
-```{r}
+```{r, include=FALSE}
 climate_temp_91_24 <- climate_temp_year_sum %>% 
   filter(year %in% 1891:1924)
 
@@ -306,25 +293,37 @@ climate_temp_93_23 <- climate_temp_year_sum %>%
 
 ```{r}
 # Average High Temperature Rank-Sum Test
-wilcox.test(subset(climate_temp_year_sum$mean_high_temp, climate_temp_year_sum$year %in% 1891:1924),
-            subset(climate_temp_year_sum$mean_high_temp, climate_temp_year_sum$year %in% 1925:1958))
+t_high_91_58_rs <- wilcox.test(subset(climate_temp_year_sum$mean_high_temp, climate_temp_year_sum$year %in% 1891:1924),
+                               subset(climate_temp_year_sum$mean_high_temp, climate_temp_year_sum$year %in% 1925:1958))
 
-wilcox.test(subset(climate_temp_year_sum$mean_high_temp, climate_temp_year_sum$year %in% 1959:1992),
-            subset(climate_temp_year_sum$mean_high_temp, climate_temp_year_sum$year %in% 1993:2023))
+t_high_59_23_rs <- wilcox.test(subset(climate_temp_year_sum$mean_high_temp, climate_temp_year_sum$year %in% 1959:1992),
+                               subset(climate_temp_year_sum$mean_high_temp, climate_temp_year_sum$year %in% 1993:2023))
 
-wilcox.test(subset(climate_temp_year_sum$mean_high_temp, climate_temp_year_sum$year %in% 1891:1924),
-            subset(climate_temp_year_sum$mean_high_temp, climate_temp_year_sum$year %in% 1993:2023))
+t_high_91_23_rs <- wilcox.test(subset(climate_temp_year_sum$mean_high_temp, climate_temp_year_sum$year %in% 1891:1924),
+                               subset(climate_temp_year_sum$mean_high_temp, climate_temp_year_sum$year %in% 1993:2023))
 
 # Average Low Temperature Rank-Sum Test
-wilcox.test(subset(climate_temp_year_sum$mean_low_temp, climate_temp_year_sum$year %in% 1891:1924),
-            subset(climate_temp_year_sum$mean_low_temp, climate_temp_year_sum$year %in% 1925:1958))
+t_low_91_58_rs <- wilcox.test(subset(climate_temp_year_sum$mean_low_temp, climate_temp_year_sum$year %in% 1891:1924),
+                              subset(climate_temp_year_sum$mean_low_temp, climate_temp_year_sum$year %in% 1925:1958))
 
-wilcox.test(subset(climate_temp_year_sum$mean_low_temp, climate_temp_year_sum$year %in% 1959:1992),
-            subset(climate_temp_year_sum$mean_low_temp, climate_temp_year_sum$year %in% 1993:2023))
+t_low_59_23_rs <- wilcox.test(subset(climate_temp_year_sum$mean_low_temp, climate_temp_year_sum$year %in% 1959:1992),
+                              subset(climate_temp_year_sum$mean_low_temp, climate_temp_year_sum$year %in% 1993:2023))
 
-wilcox.test(subset(climate_temp_year_sum$mean_low_temp, climate_temp_year_sum$year %in% 1891:1924),
-            subset(climate_temp_year_sum$mean_low_temp, climate_temp_year_sum$year %in% 1993:2023))
+t_low_91_23_rs <- wilcox.test(subset(climate_temp_year_sum$mean_low_temp, climate_temp_year_sum$year %in% 1891:1924),
+                              subset(climate_temp_year_sum$mean_low_temp, climate_temp_year_sum$year %in% 1993:2023))
 ```
+
+For average high temperatures:
+
+- Comparing the years 1891-1924 *and* 1925-1958, the rank-sum test did yield statistically significant differences in the means with a p-value of 0.0058.
+- Comparing the years 1959-1992 *and* 1993-2023, the rank-sum test did not yield statistically significant differences in the means with a p-value of 0.18.
+- Comparing the years 1891-1924 *and* 1993-2023, the rank-sum test did yield statistically significant differences in the means with a p-value of 1.36e-06.
+
+For average low temperatures:
+
+- Comparing the years 1891-1924 *and* 1925-1958, the rank-sum test did yield statistically significant differences in the means with a p-value of 2.44e-08.
+- Comparing the years 1959-1992 *and* 1993-2023, the rank-sum test did not yield statistically significant differences in the means with a p-value of 0.69.
+- Comparing the years 1891-1924 *and* 1993-2023, the rank-sum test did yield statistically significant differences in the means with a p-value of  1.26e-08.
 
 # Seasonal Trends {.tabset}
 
@@ -341,49 +340,34 @@ climate_prcp_season <- climate %>%
             total_snow = sum(snow),
             most_all_prcp = max(all_prcp),
             least_all_prcp = min(all_prcp),
-            total_all_prcp = total_snow + total_rain)
-
-climate_prcp_season <- climate_prcp_season %>% 
+            total_all_prcp = total_snow + total_rain) %>% 
   mutate(year = as.numeric(year))
 
-climate_prcp_season %>% 
-  kable(col.names = c("Year",
-                      "Season",
-                      "Largest Rain Event",
-                      "Smallest Rain Event",
-                      "Total Rainfall",
-                      "Largest Snow Event",
-                      "Smallest Snow Event",
-                      "Total Snowfall",
-                      "Largest Precipitation Event",
-                      "Smallest Precipitation Event",
-                      "Total Precipitation")) %>% 
-  kable_styling(position = "center", bootstrap_options = "striped")
+clim_prcp_summer <- climate_prcp_season %>% 
+  filter(season == "summer")
+
+clim_prcp_winter <- climate_prcp_season %>% 
+  filter(season == "winter")
 ```
 
 ### Summer {.tabset}
-
-```{r}
-clim_prcp_summer <- climate_prcp_season %>% 
-  filter(season == "summer")
-```
 
 #### Overall Time Period {.tabset}
 
 ##### Linear Model
 
 ```{r}
-ggplot(clim_prcp_summer, 
-       aes(x = year, y = total_all_prcp)) +
-  geom_point(color = "blue") +
-  geom_smooth(formula = y ~ x,
-              color = "black",
-              method = "lm",
-              se = FALSE)
+# ggplot(clim_prcp_summer, 
+#        aes(x = year, y = total_all_prcp)) +
+#   geom_point(color = "blue") +
+#   geom_smooth(formula = y ~ x,
+#               color = "black",
+#               method = "lm",
+#               se = FALSE)
 
 # trend line slope
 prcp_summer_lm <- lm(total_all_prcp ~ year, data = clim_prcp_summer)
-confint(prcp_summer_lm, "year", level = 0.95)
+prcp_summer_confint <- confint(prcp_summer_lm, "year", level = 0.95)
 
 ggplot(data = clim_prcp_summer,
        aes(x = year, y = total_all_prcp)) +
@@ -395,15 +379,19 @@ ggplot(data = clim_prcp_summer,
               se = FALSE)
 ```
 
+For yearly total summer precipitation, the y-intercept is `r round(prcp_summer_lm$coefficients[1], 2)`. The slope of total summer precipitation by year is `r round(prcp_summer_lm$coefficients[2], 3)` and is not statistically significant (p-value = 0.069).
+
 ##### Mann-Kendall
 
 ```{r}
-MannKendall(clim_prcp_summer$total_all_prcp)
+prcp_summer_mk <- MannKendall(clim_prcp_summer$total_all_prcp)
 ```
+
+For yearly total summer precipitation, the strength is 0.206 and is statistically significant with a p-value of 0.00048.
 
 #### Between Time Periods {.tabset}
 
-```{r}
+```{r, include=FALSE}
 clim_prcp_summer_91_24 <- clim_prcp_summer %>% 
   filter(year %in% 1891:1924)
 
@@ -420,39 +408,40 @@ clim_prcp_summer_93_23 <- clim_prcp_summer %>%
 ##### Rank-Sum Test
 
 ```{r}
-wilcox.test(subset(clim_prcp_summer$total_all_prcp, clim_prcp_summer$year %in% 1891:1924),
-            subset(clim_prcp_summer$total_all_prcp, clim_prcp_summer$year %in% 1925:1958))
+prcp_summer_91_58_rs <- wilcox.test(subset(clim_prcp_summer$total_all_prcp, clim_prcp_summer$year %in% 1891:1924),
+                                    subset(clim_prcp_summer$total_all_prcp, clim_prcp_summer$year %in% 1925:1958))
 
-wilcox.test(subset(clim_prcp_summer$total_all_prcp, clim_prcp_summer$year %in% 1959:1992),
-            subset(clim_prcp_summer$total_all_prcp, clim_prcp_summer$year %in% 1993:2023))
+prcp_summer_59_23_rs <- wilcox.test(subset(clim_prcp_summer$total_all_prcp, clim_prcp_summer$year %in% 1959:1992),
+                                    subset(clim_prcp_summer$total_all_prcp, clim_prcp_summer$year %in% 1993:2023))
 
-wilcox.test(subset(clim_prcp_summer$total_all_prcp, clim_prcp_summer$year %in% 1891:1924),
-            subset(clim_prcp_summer$total_all_prcp, clim_prcp_summer$year %in% 1993:2023))
+prcp_summer_91_23_rs <- wilcox.test(subset(clim_prcp_summer$total_all_prcp, clim_prcp_summer$year %in% 1891:1924),
+                                    subset(clim_prcp_summer$total_all_prcp, clim_prcp_summer$year %in% 1993:2023))
 ```
+
+Comparing the years 1891-1924 *and* 1925-1958, the rank-sum test did not yield statistically significant differences in the means with a p-value of 0.42.
+
+Comparing the years 1959-1992 *and* 1993-2023, the rank-sum test did not yield statistically significant differences in the means with a p-value of 0.37.
+
+Comparing the years 1891-1924 *and* 1993-2023, the rank-sum test did yield statistically significant differences in the means with a p-value of 0.01.
 
 ### Winter {.tabset}
-
-```{r}
-clim_prcp_winter <- climate_prcp_season %>% 
-  filter(season == "winter")
-```
 
 #### Overall Time Period {.tabset}
 
 ##### Linear Model
 
 ```{r}
-ggplot(clim_prcp_winter, 
-       aes(x = year, y = total_all_prcp)) +
-  geom_point(color = "blue") +
-  geom_smooth(formula = y ~ x,
-              color = "black",
-              method = "lm",
-              se = FALSE)
+# ggplot(clim_prcp_winter, 
+#        aes(x = year, y = total_all_prcp)) +
+#   geom_point(color = "blue") +
+#   geom_smooth(formula = y ~ x,
+#               color = "black",
+#               method = "lm",
+#               se = FALSE)
 
 # trend line slope
 prcp_winter_lm <- lm(total_all_prcp ~ year, data = clim_prcp_winter)
-confint(prcp_winter_lm, "year", level = 0.95)
+prcp_winter_confint <- confint(prcp_winter_lm, "year", level = 0.95)
 
 ggplot(data = clim_prcp_winter,
        aes(x = year, y = total_all_prcp)) +
@@ -464,15 +453,19 @@ ggplot(data = clim_prcp_winter,
               se = FALSE)
 ```
 
+For yearly total winter precipitation, the y-intercept is `r round(prcp_winter_lm$coefficients[1], 2)`. The slope for yearly winter precipitation by year is `r round(prcp_winter_lm$coefficients[2], 2)` and is statistically significant with a p-value of 3.87e-06.
+
 ##### Mann-Kendall
 
 ```{r}
-MannKendall(clim_prcp_winter$total_all_prcp)
+prcp_winter_mk <- MannKendall(clim_prcp_winter$total_all_prcp)
 ```
+
+The strength of the trend is 0.311 and is statistically significant with a p-value of 1.19e-07.
 
 #### Between Time Periods {.tabset}
 
-```{r}
+```{r, include=FALSE}
 clim_prcp_winter_91_24 <- clim_prcp_winter %>% 
   filter(year %in% 1891:1924)
 
@@ -489,15 +482,21 @@ clim_prcp_winter_93_23 <- clim_prcp_winter %>%
 ##### Rank-Sum Test
 
 ```{r}
-wilcox.test(subset(clim_prcp_winter$total_all_prcp, clim_prcp_winter$year %in% 1891:1924),
-            subset(clim_prcp_winter$total_all_prcp, clim_prcp_winter$year %in% 1925:1958))
+prcp_winter_91_58_rs <- wilcox.test(subset(clim_prcp_winter$total_all_prcp, clim_prcp_winter$year %in% 1891:1924),
+                                    subset(clim_prcp_winter$total_all_prcp, clim_prcp_winter$year %in% 1925:1958))
 
-wilcox.test(subset(clim_prcp_winter$total_all_prcp, clim_prcp_winter$year %in% 1959:1992),
-            subset(clim_prcp_winter$total_all_prcp, clim_prcp_winter$year %in% 1993:2023))
+prcp_winter_59_23_rs <- wilcox.test(subset(clim_prcp_winter$total_all_prcp, clim_prcp_winter$year %in% 1959:1992),
+                                    subset(clim_prcp_winter$total_all_prcp, clim_prcp_winter$year %in% 1993:2023))
 
-wilcox.test(subset(clim_prcp_winter$total_all_prcp, clim_prcp_winter$year %in% 1891:1924),
-            subset(clim_prcp_winter$total_all_prcp, clim_prcp_winter$year %in% 1993:2023))
+prcp_winter_91_23_rs <- wilcox.test(subset(clim_prcp_winter$total_all_prcp, clim_prcp_winter$year %in% 1891:1924),
+                                    subset(clim_prcp_winter$total_all_prcp, clim_prcp_winter$year %in% 1993:2023))
 ```
+
+Comparing the years 1891-1924 *and* 1925-1958, the rank-sum test did yield statistically significant differences in the means with a p-value of 0.019.
+
+Comparing the years 1959-1992 *and* 1993-2023, the rank-sum test did yield statistically significant differences in the means with a p-value of 2.16e-07.
+
+Comparing the years 1891-1924 *and* 1993-2023, the rank-sum test did yield statistically significant differences in the means with a p-value of 3.89e-08.
 
 ## Temperature {.tabset}
 
@@ -510,31 +509,17 @@ climate_temp_season <- climate %>%
             mean_high_temp = mean(tmax),
             max_low_temp = max(tmin),
             min_low_temp = min(tmin),
-            mean_low_temp = mean(tmin))
-
-climate_temp_year_sum <- climate_temp_year_sum %>% 
+            mean_low_temp = mean(tmin)) %>% 
   mutate(year = as.numeric(year))
 
-# table summarizing the data
-climate_temp_season %>% 
-  kable(col.names = c("Year",
-                      "Season",
-                      "Largest High Temperature",
-                      "Smallest High Temperature",
-                      "Mean High Temperature",
-                      "Largest Low Temperature",
-                      "Smallest Low Temperature",
-                      "Mean Low Temperature")) %>% 
-  kable_styling(position = "center", bootstrap_options = "striped")
+clim_temp_summer <- climate_temp_season %>% 
+  filter(season == "summer")
+
+clim_temp_winter <- climate_temp_season %>% 
+  filter(season == "winter")
 ```
 
 ### Summer {.tabset}
-
-```{r}
-clim_temp_summer <- climate_temp_season %>% 
-  filter(season == "summer") %>% 
-  mutate(year = as.numeric(year))
-```
 
 #### Overall Time Period {.tabset}
 
@@ -542,39 +527,28 @@ clim_temp_summer <- climate_temp_season %>%
 
 ```{r}
 # graph plotting the average high and low temperatures each year with trend lines
-ggplot(clim_temp_summer) +
-  geom_point(aes(x = year, y = mean_high_temp), 
-             color = "red") +
-  geom_smooth(aes(x = year, y = mean_high_temp), 
-              formula = y ~ x, 
-              color = "black", 
-              method = "lm",
-              se = FALSE) +
-  geom_point(aes(x = year, y = mean_low_temp), 
-             color = "blue") +
-  geom_smooth(aes(x = year, y = mean_low_temp),
-              formula = y ~ x, 
-              color = "black",
-              method = "lm",
-              se = FALSE)
+# ggplot(clim_temp_summer) +
+#   geom_point(aes(x = year, y = mean_high_temp), 
+#              color = "red") +
+#   geom_smooth(aes(x = year, y = mean_high_temp), 
+#               formula = y ~ x, 
+#               color = "black", 
+#               method = "lm",
+#               se = FALSE) +
+#   geom_point(aes(x = year, y = mean_low_temp), 
+#              color = "blue") +
+#   geom_smooth(aes(x = year, y = mean_low_temp),
+#               formula = y ~ x, 
+#               color = "black",
+#               method = "lm",
+#               se = FALSE)
 
 # trend line slopes
-high_temp_summer_lm <- lm(mean_high_temp ~ year, data = clim_temp_summer)
-summary(high_temp_summer_lm)
-confint(high_temp_summer_lm, "year", level = 0.95)
+t_high_summer_lm <- lm(mean_high_temp ~ year, data = clim_temp_summer)
+t_high_summer_confint <- confint(t_high_summer_lm, "year", level = 0.95)
 
-low_temp_summer_lm <- lm(mean_low_temp ~ year, data = clim_temp_summer)
-summary(low_temp_summer_lm)
-confint(low_temp_summer_lm, "year", level = 0.95)
-
-ggplot(data = clim_temp_summer, 
-       aes(x = year, y = mean_high_temp)) +
-  stat_summary(fun = "mean", 
-               geom = "point", 
-               color = "red") +
-  geom_smooth(method = "lm",
-              color = "black",
-              se = FALSE)
+t_low_summer_lm <- lm(mean_low_temp ~ year, data = clim_temp_summer)
+t_low_summer_confint <- confint(t_low_summer_lm, "year", level = 0.95)
 
 ggplot(data = clim_temp_summer, 
        aes(x = year, y = mean_low_temp)) +
@@ -584,21 +558,47 @@ ggplot(data = clim_temp_summer,
   geom_smooth(method = "lm",
               color = "black",
               se = FALSE)
+
+ggplot(data = clim_temp_summer) +
+  stat_summary(aes(x = year, y = mean_high_temp),
+               fun = "mean",
+               geom = "point",
+               color = "red") +
+  stat_summary(aes(x = year, y = mean_low_temp),
+               fun = "mean",
+               geom = "point",
+               color = "blue") +
+  geom_smooth(aes(x = year, y = mean_high_temp),
+              method = "lm",
+              color = "darkred",
+              se = FALSE) +
+  geom_smooth(aes(x = year, y = mean_low_temp),
+              method = "lm",
+              color = "darkblue",
+              se = FALSE)
 ```
 
-#### Mann-Kendall
+For yearly summer average high temperatures, the y-intercept is `r round(t_high_summer_lm$coefficients[1], 2)`. The slope for average high temperature per year is `r round(t_high_summer_lm$coefficients[2], 3)` and is not statistically significant with a p-value of 0.066.
+
+For yearly summer average low temperatures, they y-intercept is `r round(t_low_summer_lm$coefficients[1], 2)`. The slope for average low temperature per year is `r round(t_low_summer_lm$coefficients[2], 3)` and is statistically significant with a p-value of 6.01e-05.
+
+##### Mann-Kendall
 
 ```{r}
 # Mann Kendall method for average high temperature
-MannKendall(clim_temp_summer$mean_high_temp)
+t_high_summer_mk <- MannKendall(clim_temp_summer$mean_high_temp)
 
 # Mann Kendall method for average low temperature
-MannKendall(clim_temp_summer$mean_low_temp)
+t_low_summer_mk <- MannKendall(clim_temp_summer$mean_low_temp)
 ```
 
-### Between Time Periods {.tabset}
+For yearly summer average high temperatures, the strength of the trend is 0.12 and is statistically significant with a p-value of 0.04.
 
-```{r}
+For yearly summer average low temperatures, the strength of the trend is 0.25 and is statistically significant with a p-value of 3.52e-05.
+
+#### Between Time Periods {.tabset}
+
+```{r, include=FALSE}
 climate_temp_summer_91_24 <- clim_temp_summer %>% 
   filter(year %in% 1891:1924)
 
@@ -612,37 +612,43 @@ climate_temp_summer_93_23 <- clim_temp_summer %>%
   filter(year %in% 1993:2023)
 ```
 
-#### Rank-Sum Test
+##### Rank-Sum Test
 
 ```{r}
 # Average High Temperature Rank-Sum Test
-wilcox.test(subset(clim_temp_summer$mean_high_temp, clim_temp_summer$year %in% 1891:1924),
-            subset(clim_temp_summer$mean_high_temp, clim_temp_summer$year %in% 1925:1958))
+t_high_summer_91_58_rs <- wilcox.test(subset(clim_temp_summer$mean_high_temp, clim_temp_summer$year %in% 1891:1924),
+                                      subset(clim_temp_summer$mean_high_temp, clim_temp_summer$year %in% 1925:1958))
 
-wilcox.test(subset(clim_temp_summer$mean_high_temp, clim_temp_summer$year %in% 1959:1992),
-            subset(clim_temp_summer$mean_high_temp, clim_temp_summer$year %in% 1993:2023))
+t_high_summer_59_23_rs <- wilcox.test(subset(clim_temp_summer$mean_high_temp, clim_temp_summer$year %in% 1959:1992),
+                                      subset(clim_temp_summer$mean_high_temp, clim_temp_summer$year %in% 1993:2023))
 
-wilcox.test(subset(clim_temp_summer$mean_high_temp, clim_temp_summer$year %in% 1891:1924),
-            subset(clim_temp_summer$mean_high_temp, clim_temp_summer$year %in% 1993:2023))
+t_high_summer_91_23_rs <- wilcox.test(subset(clim_temp_summer$mean_high_temp, clim_temp_summer$year %in% 1891:1924),
+                                      subset(clim_temp_summer$mean_high_temp, clim_temp_summer$year %in% 1993:2023))
 
 # Average Low Temperature Rank-Sum Test
-wilcox.test(subset(clim_temp_summer$mean_low_temp, clim_temp_summer$year %in% 1891:1924),
-            subset(clim_temp_summer$mean_low_temp, clim_temp_summer$year %in% 1925:1958))
+t_low_summer_91_58_rs <- wilcox.test(subset(clim_temp_summer$mean_low_temp, clim_temp_summer$year %in% 1891:1924),
+                                     subset(clim_temp_summer$mean_low_temp, clim_temp_summer$year %in% 1925:1958))
 
-wilcox.test(subset(clim_temp_summer$mean_low_temp, clim_temp_summer$year %in% 1959:1992),
-            subset(clim_temp_summer$mean_low_temp, clim_temp_summer$year %in% 1993:2023))
+t_low_summer_59_23_rs <- wilcox.test(subset(clim_temp_summer$mean_low_temp, clim_temp_summer$year %in% 1959:1992),
+                                     subset(clim_temp_summer$mean_low_temp, clim_temp_summer$year %in% 1993:2023))
 
-wilcox.test(subset(clim_temp_summer$mean_low_temp, clim_temp_summer$year %in% 1891:1924),
-            subset(clim_temp_summer$mean_low_temp, clim_temp_summer$year %in% 1993:2023))
+t_low_summer_91_23_rs <- wilcox.test(subset(clim_temp_summer$mean_low_temp, clim_temp_summer$year %in% 1891:1924),
+                                     subset(clim_temp_summer$mean_low_temp, clim_temp_summer$year %in% 1993:2023))
 ```
+
+For yearly average summer high temperatures:
+
+- Comparing the years 1891-1924 *and* 1925-1958, the rank-sum test did yield not statistically significant differences in the means with a p-value of 0.36.
+- Comparing the years 1959-1992 *and* 1993-2023, the rank-sum test did not yield statistically significant differences in the means with a p-value of 0.16.
+- Comparing the years 1891-1924 *and* 1993-2023, the rank-sum test did yield statistically significant differences in the means with a p-value of 0.018.
+
+For yearly average summer low temperatures:
+
+- Comparing the years 1891-1924 *and* 1925-1958, the rank-sum test did yield statistically significant differences in the means with a p-value of 1.6e-05.
+- Comparing the years 1959-1992 *and* 1993-2023, the rank-sum test did not yield statistically significant differences in the means with a p-value of 0.7.
+- Comparing the years 1891-1924 *and* 1993-2023, the rank-sum test did yield statistically significant differences in the means with a p-value of 4.74e-06.
 
 ### Winter {.tabset}
-
-```{r}
-clim_temp_winter <- climate_temp_season %>% 
-  filter(season == "winter") %>% 
-  mutate(year = as.numeric(year))
-```
 
 #### Overall Time Period {.tabset}
 
@@ -650,63 +656,69 @@ clim_temp_winter <- climate_temp_season %>%
 
 ```{r}
 # graph plotting the average high and low temperatures each year with trend lines
-ggplot(clim_temp_winter) +
-  geom_point(aes(x = year, y = mean_high_temp), 
-             color = "red") +
-  geom_smooth(aes(x = year, y = mean_high_temp), 
-              formula = y ~ x, 
-              color = "black", 
-              method = "lm",
-              se = FALSE) +
-  geom_point(aes(x = year, y = mean_low_temp), 
-             color = "blue") +
-  geom_smooth(aes(x = year, y = mean_low_temp),
-              formula = y ~ x, 
-              color = "black",
-              method = "lm",
-              se = FALSE)
+# ggplot(clim_temp_winter) +
+#   geom_point(aes(x = year, y = mean_high_temp), 
+#              color = "red") +
+#   geom_smooth(aes(x = year, y = mean_high_temp), 
+#               formula = y ~ x, 
+#               color = "black", 
+#               method = "lm",
+#               se = FALSE) +
+#   geom_point(aes(x = year, y = mean_low_temp), 
+#              color = "blue") +
+#   geom_smooth(aes(x = year, y = mean_low_temp),
+#               formula = y ~ x, 
+#               color = "black",
+#               method = "lm",
+#               se = FALSE)
 
 # trend line slopes
-high_temp_winter_lm <- lm(mean_high_temp ~ year, data = clim_temp_winter)
-summary(high_temp_winter_lm)
-confint(high_temp_winter_lm, "year", level = 0.95)
+t_high_winter_lm <- lm(mean_high_temp ~ year, data = clim_temp_winter)
+t_high_winter_confint <- confint(t_high_winter_lm, "year", level = 0.95)
 
-low_temp_winter_lm <- lm(mean_low_temp ~ year, data = clim_temp_winter)
-summary(low_temp_winter_lm)
-confint(low_temp_winter_lm, "year", level = 0.95)
+t_low_winter_lm <- lm(mean_low_temp ~ year, data = clim_temp_winter)
+t_low_winter_confint <- confint(t_low_winter_lm, "year", level = 0.95)
 
-ggplot(data = clim_temp_winter, 
-       aes(x = year, y = mean_high_temp)) +
-  stat_summary(fun = "mean", 
-               geom = "point", 
+ggplot(data = clim_temp_winter) +
+  stat_summary(aes(x = year, y = mean_high_temp),
+               fun = "mean",
+               geom = "point",
                color = "red") +
-  geom_smooth(method = "lm",
-              color = "black",
-              se = FALSE)
-
-ggplot(data = clim_temp_winter, 
-       aes(x = year, y = mean_low_temp)) +
-  stat_summary(fun = "mean", 
-               geom = "point", 
+  stat_summary(aes(x = year, y = mean_low_temp),
+               fun = "mean",
+               geom = "point",
                color = "blue") +
-  geom_smooth(method = "lm",
-              color = "black",
+  geom_smooth(aes(x = year, y = mean_high_temp),
+              method = "lm",
+              color = "darkred",
+              se = FALSE) +
+  geom_smooth(aes(x = year, y = mean_low_temp),
+              method = "lm",
+              color = "darkblue",
               se = FALSE)
 ```
 
-#### Mann-Kendall
+For yearly winter average high temperatures, the y-intercept is `r round(t_high_winter_lm$coefficients[1], 2)`. The slope for average high temperature per year is `r round(t_high_winter_lm$coefficients[2], 3)` and is statistically significant with a p-value of 2.33e-06.
+
+For yearly winter average low temperatures, they y-intercept is `r round(t_low_winter_lm$coefficients[1], 2)`. The slope for average low temperature per year is `r round(t_low_winter_lm$coefficients[2], 3)` and is statistically significant with a p-value of 5.6e-05.
+
+##### Mann-Kendall
 
 ```{r}
 # Mann Kendall method for average high temperature
-MannKendall(clim_temp_winter$mean_high_temp)
+t_high_winter_mk <- MannKendall(clim_temp_winter$mean_high_temp)
 
 # Mann Kendall method for average low temperature
-MannKendall(clim_temp_winter$mean_low_temp)
+t_low_winter_mk <- MannKendall(clim_temp_winter$mean_low_temp)
 ```
 
-### Between Time Periods {.tabset}
+For yearly winter average high temperatures, the strength of the trend is 0.26 and is statistically significant with a p-value of 1.19e-05.
 
-```{r}
+For yearly winter average low temperatures, the strength of the trend is 0.21 and is statistically significant with a p-value of 0.00029.
+
+#### Between Time Periods {.tabset}
+
+```{r, include=FALSE}
 climate_temp_winter_91_24 <- clim_temp_winter %>% 
   filter(year %in% 1891:1924)
 
@@ -720,26 +732,42 @@ climate_temp_winter_93_23 <- clim_temp_winter %>%
   filter(year %in% 1993:2023)
 ```
 
-#### Rank-Sum Test
+##### Rank-Sum Test
 
 ```{r}
 # Average High Temperature Rank-Sum Test
-wilcox.test(subset(clim_temp_winter$mean_high_temp, clim_temp_winter$year %in% 1891:1924),
-            subset(clim_temp_winter$mean_high_temp, clim_temp_winter$year %in% 1925:1958))
+t_high_winter_91_58_rs <- wilcox.test(subset(clim_temp_winter$mean_high_temp, clim_temp_winter$year %in% 1891:1924),
+                                      subset(clim_temp_winter$mean_high_temp, clim_temp_winter$year %in% 1925:1958))
 
-wilcox.test(subset(clim_temp_winter$mean_high_temp, clim_temp_winter$year %in% 1959:1992),
-            subset(clim_temp_winter$mean_high_temp, clim_temp_winter$year %in% 1993:2023))
+t_high_winter_59_23_rs <- wilcox.test(subset(clim_temp_winter$mean_high_temp, clim_temp_winter$year %in% 1959:1992),
+                                      subset(clim_temp_winter$mean_high_temp, clim_temp_winter$year %in% 1993:2023))
 
-wilcox.test(subset(clim_temp_winter$mean_high_temp, clim_temp_winter$year %in% 1891:1924),
-            subset(clim_temp_winter$mean_high_temp, clim_temp_winter$year %in% 1993:2023))
+t_high_winter_91_23_rs <- wilcox.test(subset(clim_temp_winter$mean_high_temp, clim_temp_winter$year %in% 1891:1924),
+                                      subset(clim_temp_winter$mean_high_temp, clim_temp_winter$year %in% 1993:2023))
 
 # Average Low Temperature Rank-Sum Test
-wilcox.test(subset(clim_temp_winter$mean_low_temp, clim_temp_winter$year %in% 1891:1924),
-            subset(clim_temp_winter$mean_low_temp, clim_temp_winter$year %in% 1925:1958))
+t_low_winter_91_58_rs <- wilcox.test(subset(clim_temp_winter$mean_low_temp, clim_temp_winter$year %in% 1891:1924),
+                                     subset(clim_temp_winter$mean_low_temp, clim_temp_winter$year %in% 1925:1958))
 
-wilcox.test(subset(clim_temp_winter$mean_low_temp, clim_temp_winter$year %in% 1959:1992),
-            subset(clim_temp_winter$mean_low_temp, clim_temp_winter$year %in% 1993:2023))
+t_low_winter_59_23_rs <- wilcox.test(subset(clim_temp_winter$mean_low_temp, clim_temp_winter$year %in% 1959:1992),
+                                     subset(clim_temp_winter$mean_low_temp, clim_temp_winter$year %in% 1993:2023))
 
-wilcox.test(subset(clim_temp_winter$mean_low_temp, clim_temp_winter$year %in% 1891:1924),
-            subset(clim_temp_winter$mean_low_temp, clim_temp_winter$year %in% 1993:2023))
+t_low_winter_91_23_rs <- wilcox.test(subset(clim_temp_winter$mean_low_temp, clim_temp_winter$year %in% 1891:1924),
+                                     subset(clim_temp_winter$mean_low_temp, clim_temp_winter$year %in% 1993:2023))
 ```
+
+For yearly average winter high temperatures:
+
+- Comparing the years 1891-1924 *and* 1925-1958, the rank-sum test did yield statistically significant differences in the means with a p-value of 0.00063.
+- Comparing the years 1959-1992 *and* 1993-2023, the rank-sum test did yield statistically significant differences in the means with a p-value of 0.032.
+- Comparing the years 1891-1924 *and* 1993-2023, the rank-sum test did yield statistically significant differences in the means with a p-value of 7.83e-05.
+
+For yearly average winter low temperatures:
+
+- Comparing the years 1891-1924 *and* 1925-1958, the rank-sum test did yield statistically significant differences in the means with a p-value of 7.91e-05.
+- Comparing the years 1959-1992 *and* 1993-2023, the rank-sum test did not yield statistically significant differences in the means with a p-value of 0.14.
+- Comparing the years 1891-1924 *and* 1993-2023, the rank-sum test did yield statistically significant differences in the means with a p-value of 0.00021.
+
+# Data Citation
+
+NOAA. (2023). Daily Summaries at the Ann Arbor University of Michigan Station. NOAA. https://www.ncei.noaa.gov/cdo-web/datasets/GHCND/stations/GHCND:USC00200230/detail
