@@ -2,11 +2,13 @@
 title: "Ann Arbor Climate Extremes"
 author: "Kiera Matiska"
 date: "2023-04-15"
-output: html_document
+output: 
+  html_document:
+    code_folding: hide
 ---
 
-```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+```{r setup, include=FALSE, message=FALSE, warning=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
 
 library(tidyverse)
 library(here)
@@ -87,7 +89,6 @@ ggplot(data = clim_fr_sum,
               se = FALSE)
 
 freeze_lm <- lm(freeze_days ~ year, data = clim_fr_sum)
-summary(freeze_lm)
 ```
 
 The y-intercept value stands at `r round(freeze_lm$coefficients[1], 2)` days. The slope for freeze days per year is `r round(freeze_lm$coefficients[2], 3)` and is statistically significant with a p-value of 5.82e-06.
@@ -111,12 +112,11 @@ ggplot(data = clim_ht_sum,
               se = FALSE)
 
 heat_lm <- lm(heat_days ~ year, data = clim_ht_sum)
-summary(heat_lm)
 ```
 
 The y-intercept value stands at `r round(heat_lm$coefficients[1], 2)` days. The slope for heat days per year is `r round(heat_lm$coefficients[2], 3)` and is not statistically significant with a p-value of 0.14.
 
-### Precipitation
+## Precipitation
 
 ```{r}
 climate$precip <- ifelse(climate$all_prcp >= 1.25, 1, 0)
@@ -135,7 +135,6 @@ ggplot(data = clim_prcp_sum,
               se = FALSE)
 
 all_precip_lm <- lm(high_precip_days ~ year, data = clim_prcp_sum)
-summary(all_precip_lm)
 ```
 
 The y-intercept value stands at `r round(all_precip_lm$coefficients[1], 2)` days. The slope for extreme precipitation days per year is `r round(all_precip_lm$coefficients[2], 3)` and is statistically significant with a p-value of 2.36e-10.
