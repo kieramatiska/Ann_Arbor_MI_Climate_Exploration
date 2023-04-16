@@ -143,7 +143,11 @@ ggplot(data = climate_prcp_year_sum,
                color = "blue") +
   geom_smooth(method = "lm",
               color = "black",
-              se = FALSE)
+              se = FALSE) +
+  labs(title = "Total Annual Precipitation by Year from 1891-2023",
+       x = "Year",
+       y = "Total Annual Precipitation (inches)") +
+  theme(plot.title = element_text(hjust = 0.5))
 ```
 
 The y-intercept value stands at `r round(precip_lm$coefficients[1], 2)` inches. The slope for precipitation by year is `r round(precip_lm$coefficients[2], 3)` and is statistically significant with a p-value of 2.09e-09.
@@ -252,7 +256,11 @@ ggplot(data = climate_temp_year_sum) +
   geom_smooth(aes(x = year, y = mean_low_temp),
               method = "lm",
               color = "darkblue",
-              se = FALSE)
+              se = FALSE) +
+  labs(title = "Average High and Low Temperature from 1891-2023",
+       x = "Year",
+       y = "Temperature (°F)") +
+  theme(plot.title = element_text(hjust = 0.5))
 ```
 
 For average high temperatures, the y-intercept is `r round(t_high_lm$coefficients[1], 2)`. The slope for average high temperature per year is `r round(t_high_lm$coefficients[2], 2)` and is statistically significant with a p-value of 5.78e-05.

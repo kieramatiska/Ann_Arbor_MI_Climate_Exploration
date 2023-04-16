@@ -86,7 +86,11 @@ ggplot(data = clim_fr_sum,
   geom_smooth(formula = y ~ x,
               color = "black",
               method = "lm",
-              se = FALSE)
+              se = FALSE) +
+  labs(title = "Number of Extremely Cold Days per Year from 1891-2023",
+       x = "Year",
+       y = "Number of Extremely Cold Days") +
+  theme(plot.title = element_text(hjust = 0.5))
 
 freeze_lm <- lm(freeze_days ~ year, data = clim_fr_sum)
 ```
@@ -132,7 +136,11 @@ ggplot(data = clim_prcp_sum,
   geom_smooth(formula = y ~ x,
               color = "black",
               method = "lm",
-              se = FALSE)
+              se = FALSE) +
+  labs(title = "Number of Extreme Precipitation Events per Year from 1891-2023",
+       x = "Year",
+       y = "Number of Extreme Precipitation Events") +
+  theme(plot.title = element_text(hjust = 0.5))
 
 all_precip_lm <- lm(high_precip_days ~ year, data = clim_prcp_sum)
 ```
